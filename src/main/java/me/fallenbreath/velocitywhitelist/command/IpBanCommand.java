@@ -93,21 +93,24 @@ public class IpBanCommand
 		InetAddress addr = com.google.common.net.InetAddresses.forString(checkIp);
 		String targetIp = addr.getHostAddress();
 
-		if (list.addIp(targetIp))
+		synchronized (this.manager.getIpBanLock())
 		{
-			if (this.manager.saveIpList(list))
+			if (list.addIp(targetIp))
 			{
-				source.sendMessage(Component.text(String.format("Added IP %s to the IP ban list", targetIp)));
+				if (this.manager.saveIpList(list))
+				{
+					source.sendMessage(Component.text(String.format("Added IP %s to the IP ban list", targetIp)));
 
-				// Automatically disconnect anyone connected on that IP
-				this.manager.kickPlayersOnIp(targetIp);
-				return 1;
-			}
-			else
-			{
-				list.removeIp(targetIp); // rollback
-				source.sendMessage(Component.text("Error: Failed to save the IP ban list to disk. Action was not applied."));
-				return 0;
+					// Automatically disconnect anyone connected on that IP
+					this.manager.kickPlayersOnIp(targetIp);
+					return 1;
+				}
+				else
+				{
+					list.removeIp(targetIp); // rollback
+					source.sendMessage(Component.text("Error: Failed to save the IP ban list to disk. Action was not applied."));
+					return 0;
+				}
 			}
 		}
 
@@ -138,18 +141,21 @@ public class IpBanCommand
 		InetAddress addr = com.google.common.net.InetAddresses.forString(checkIp);
 		String targetIp = addr.getHostAddress();
 
-		if (list.removeIp(targetIp))
+		synchronized (this.manager.getIpBanLock())
 		{
-			if (this.manager.saveIpList(list))
+			if (list.removeIp(targetIp))
 			{
-				source.sendMessage(Component.text(String.format("Removed IP %s from the IP ban list", targetIp)));
-				return 1;
-			}
-			else
-			{
-				list.addIp(targetIp); // rollback
-				source.sendMessage(Component.text("Error: Failed to save the IP ban list to disk. Action was not applied."));
-				return 0;
+				if (this.manager.saveIpList(list))
+				{
+					source.sendMessage(Component.text(String.format("Removed IP %s from the IP ban list", targetIp)));
+					return 1;
+				}
+				else
+				{
+					list.addIp(targetIp); // rollback
+					source.sendMessage(Component.text("Error: Failed to save the IP ban list to disk. Action was not applied."));
+					return 0;
+				}
 			}
 		}
 
@@ -181,15 +187,18 @@ public class IpBanCommand
 			return 0;
 		}
 
-		if (this.manager.loadIpList(list))
+		synchronized (this.manager.getIpBanLock())
 		{
-			source.sendMessage(Component.text("IP ban list reloaded"));
-			return 1;
-		}
-		else
-		{
-			source.sendMessage(Component.text("IP ban list reload failed, see console for details"));
-			return 0;
+			if (this.manager.loadIpList(list))
+			{
+				source.sendMessage(Component.text("IP ban list reloaded"));
+				return 1;
+			}
+			else
+			{
+				source.sendMessage(Component.text("IP ban list reload failed, see console for details"));
+				return 0;
+			}
 		}
 	}
 }
