@@ -44,6 +44,10 @@ public class WhitelistManager
 	private int autoBlacklistCount = 0;
 	private static final int MAX_AUTO_BLACKLISTS_PER_WINDOW = 5;
 	private static final long RATE_LIMIT_WINDOW_MS = 10000; // 10 seconds
+	
+	// Track the last time a rate-limited skip warning was printed to avoid spamming console
+	private long lastSkipWarningLogTime = 0;
+	private static final long SKIP_WARNING_LOG_COOLDOWN_MS = 5000; // 5 seconds
 
 	public WhitelistManager(Logger logger, Configuration config, Path dataDirectory, ProxyServer server)
 	{
@@ -612,7 +616,12 @@ public class WhitelistManager
 							}
 							else
 							{
-								this.logger.warn("Skipping automatic blacklist addition for {} ({}) due to rate-limit protection (IP ban is still enforced)", profile.getName(), profile.getId());
+								long lastLog = this.lastSkipWarningLogTime;
+								if (now - lastLog > SKIP_WARNING_LOG_COOLDOWN_MS)
+								{
+									this.lastSkipWarningLogTime = now;
+									this.logger.warn("Skipping automatic blacklist additions due to rate-limit protection (IP ban is still enforced)");
+								}
 							}
 						}
 					}
