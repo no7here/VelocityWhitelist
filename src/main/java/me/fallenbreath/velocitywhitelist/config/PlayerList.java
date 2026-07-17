@@ -119,6 +119,23 @@ public class PlayerList
 		}
 	}
 
+	public boolean updatePlayerUuidName(UUID uuid, @NotNull String currentName)
+	{
+		synchronized (this.lock)
+		{
+			if (this.uuids.containsKey(uuid))
+			{
+				String oldName = this.uuids.get(uuid);
+				if (!currentName.equals(oldName))
+				{
+					this.uuids.put(uuid, currentName);
+					return true;
+				}
+			}
+			return false;
+		}
+	}
+
 	public static class PlayerUUIDComputeResult<T>
 	{
 		public boolean addNewValue = false;
@@ -195,13 +212,13 @@ public class PlayerList
 		synchronized (this.lock)
 		{
 			this.names.clear();
-			if (options.get("names") instanceof List list)
+			if (options != null && options.get("names") instanceof List list)
 			{
 				list.forEach(entry -> this.names.add(entry.toString()));
 			}
 
 			this.uuids.clear();
-			if (options.get("uuids") instanceof List list)
+			if (options != null && options.get("uuids") instanceof List list)
 			{
 				list.forEach(item -> {
 					if (item instanceof String s)
