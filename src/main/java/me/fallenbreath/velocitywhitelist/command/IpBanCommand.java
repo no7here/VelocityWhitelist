@@ -192,6 +192,9 @@ public class IpBanCommand
 			if (this.manager.loadIpList(list))
 			{
 				source.sendMessage(Component.text("IP ban list reloaded"));
+				
+				// Scan connected players and disconnect matching players who got banned in the reloaded file
+				this.manager.kickIpBannedPlayers();
 				return 1;
 			}
 			else
