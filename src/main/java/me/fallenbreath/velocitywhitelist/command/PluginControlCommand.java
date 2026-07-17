@@ -45,7 +45,7 @@ public class PluginControlCommand
 		{
 			this.config.reload();
 			this.manager.loadLists();
-			source.sendMessage(Component.text("Reloaded config, whitelist and blacklist"));
+			source.sendMessage(Component.text("Reloaded config, whitelist, blacklist and IP ban list"));
 			return 1;
 		}
 		catch (Exception e)
@@ -65,6 +65,9 @@ public class PluginControlCommand
 		WhitelistCommand.showListStatus(source, this.manager.getWhitelist(), "  ");
 		source.sendMessage(Component.text("Blacklist:"));
 		WhitelistCommand.showListStatus(source, this.manager.getBlacklist(), "  ");
+		source.sendMessage(Component.text("IP Ban List:"));
+		source.sendMessage(Component.text(String.format("  Activated: %s (config enabled: %s, load ok: %s)", this.manager.getIpBanList().isActivated(), this.manager.getIpBanList().isConfigEnabled(), this.manager.getIpBanList().isLoadOk())));
+		source.sendMessage(Component.text(String.format("  Size: %d IP addresses", this.manager.getIpBanList().getIps().size())));
 		return 0;
 	}
 }
