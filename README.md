@@ -86,7 +86,7 @@ Requires the permission `velocitywhitelist.command`.
 **IP Bans:**
 - `/ipban` - Show plugin status.
 - `/ipban <add / remove> <ip>` - Ban or unban an IP address.
-- `/ipban list` - List all IPs on the blacklist.
+- `/ipban list` - List all IPs on the IP ban list.
 - `/ipban reload` - Reload IP ban file from disk. Doesn't reload config.
 
 **Plugin Control:** 
