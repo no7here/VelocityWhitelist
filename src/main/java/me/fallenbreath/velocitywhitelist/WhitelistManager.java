@@ -186,7 +186,7 @@ public class WhitelistManager
 			profile = uuid.flatMap(this.server::getPlayer).map(Player::getGameProfile);
 		}
 
-		// uuid: get from value directly, or mojang api (lookuped by input value)
+		// uuid: get from value directly, or mojang api (looked up by input value)
 		// profile: get from server online player, lookuped by input value (name / uuid)
 
 		return switch (this.config.getIdentifyMode())
