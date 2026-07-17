@@ -182,6 +182,11 @@ public class IpList
 			if (options != null && options.get("ips") instanceof List<?> list)
 			{
 				list.forEach(entry -> {
+					if (entry == null)
+					{
+						logger.warn("Skipping null/empty IP ban entry");
+						return;
+					}
 					String rawIp = entry.toString().trim();
 					String cleanIp = stripScopeId(rawIp);
 					try
