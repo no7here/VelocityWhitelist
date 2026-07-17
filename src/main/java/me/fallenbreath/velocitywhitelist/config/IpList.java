@@ -77,18 +77,30 @@ public class IpList
 		}
 	}
 
+	private static String stripScopeId(String ip)
+	{
+		int pct = ip.indexOf('%');
+		if (pct != -1)
+		{
+			return ip.substring(0, pct);
+		}
+		return ip;
+	}
+
 	public boolean checkIp(String ipStr)
 	{
 		synchronized (this.lock)
 		{
+			String cleanIp = stripScopeId(ipStr.trim());
 			try
 			{
-				InetAddress target = InetAddress.getByName(ipStr.trim());
+				InetAddress target = InetAddress.getByName(cleanIp);
 				for (String ip : this.ips)
 				{
 					try
 					{
-						InetAddress addr = InetAddress.getByName(ip.trim());
+						String cleanListedIp = stripScopeId(ip.trim());
+						InetAddress addr = InetAddress.getByName(cleanListedIp);
 						if (Arrays.equals(target.getAddress(), addr.getAddress()))
 						{
 							return true;
@@ -99,7 +111,7 @@ public class IpList
 			}
 			catch (UnknownHostException e)
 			{
-				return this.ips.contains(ipStr.trim());
+				return this.ips.contains(cleanIp);
 			}
 			return false;
 		}
@@ -109,7 +121,7 @@ public class IpList
 	{
 		synchronized (this.lock)
 		{
-			String trimmed = ipStr.trim();
+			String trimmed = stripScopeId(ipStr.trim());
 			try
 			{
 				InetAddress addr = InetAddress.getByName(trimmed);
@@ -135,7 +147,7 @@ public class IpList
 	{
 		synchronized (this.lock)
 		{
-			String trimmed = ipStr.trim();
+			String trimmed = stripScopeId(ipStr.trim());
 			try
 			{
 				InetAddress target = InetAddress.getByName(trimmed);
@@ -144,7 +156,8 @@ public class IpList
 				{
 					try
 					{
-						InetAddress addr = InetAddress.getByName(ip.trim());
+						String cleanListedIp = stripScopeId(ip.trim());
+						InetAddress addr = InetAddress.getByName(cleanListedIp);
 						if (Arrays.equals(target.getAddress(), addr.getAddress()))
 						{
 							toRemove = ip;
