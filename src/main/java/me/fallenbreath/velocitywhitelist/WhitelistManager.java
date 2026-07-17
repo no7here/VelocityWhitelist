@@ -169,26 +169,26 @@ public class WhitelistManager
 
 		return switch (this.config.getIdentifyMode())
 		{
-		    case NAME -> {
-		        if (inputUuid.isPresent())
-		        {
-		            source.sendPlainMessage("WARN: Trying to use UUID in NAME mode. Nothing will happen");
-		            yield false;
-		        }
-		        yield handleNameMode.handle(profile.map(GameProfile::getId).orElse(null), value);
-		    }
+			case NAME -> {
+				if (inputUuid.isPresent())
+				{
+					source.sendPlainMessage("WARN: Trying to use UUID in NAME mode. Nothing will happen");
+					yield false;
+				}
+				yield handleNameMode.handle(profile.map(GameProfile::getId).orElse(null), value);
+			}
 		
-		    case UUID -> {
-		        if (uuid.isEmpty() && profile.isEmpty())
-		        {
-		            source.sendPlainMessage("WARN: Trying to use a player name in UUID mode, and the player is not valid. Nothing will happen");
-		            yield false;
-		        }
+			case UUID -> {
+				if (uuid.isEmpty() && profile.isEmpty())
+				{
+					source.sendPlainMessage("WARN: Trying to use a player name in UUID mode, and the player is not valid. Nothing will happen");
+					yield false;
+				}
 		
-		        UUID playerUuid = uuid.isPresent() ? uuid.get() : profile.get().getId();
-		        String playerName = profile.map(GameProfile::getName).orElse(null);
-		        yield handleUuidMode.handle(playerUuid, playerName, pretty(playerUuid, playerName));
-		    }
+				UUID playerUuid = uuid.isPresent() ? uuid.get() : profile.get().getId();
+				String playerName = profile.map(GameProfile::getName).orElse(null);
+				yield handleUuidMode.handle(playerUuid, playerName, pretty(playerUuid, playerName));
+			}
 		};
 	}
 
