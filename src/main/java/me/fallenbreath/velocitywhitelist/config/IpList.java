@@ -179,27 +179,35 @@ public class IpList
 		synchronized (this.lock)
 		{
 			this.ips.clear();
-			if (options != null && options.get("ips") instanceof List<?> list)
+			if (options != null)
 			{
-				list.forEach(entry -> {
-					if (entry == null)
+				Object ipsVal = options.get("ips");
+				if (ipsVal != null)
+				{
+					if (!(ipsVal instanceof List<?> list))
 					{
-						logger.warn("Skipping null/empty IP ban entry");
-						return;
+						throw new IOException("The 'ips' field in the config is malformed (not a YAML list)");
 					}
-					String rawIp = entry.toString().trim();
-					String cleanIp = stripScopeId(rawIp);
-					
-					// Strict offline IP-literal validation using Guava to prevent DNS name lookups or empty string resolution to loopback
-					if (!com.google.common.net.InetAddresses.isInetAddress(cleanIp))
-					{
-						logger.warn("Skipping invalid/unresolvable IP ban entry: {}", rawIp);
-						return;
-					}
-					
-					InetAddress addr = com.google.common.net.InetAddresses.forString(cleanIp);
-					this.ips.add(addr.getHostAddress());
-				});
+					list.forEach(entry -> {
+						if (entry == null)
+						{
+							logger.warn("Skipping null/empty IP ban entry");
+							return;
+						}
+						String rawIp = entry.toString().trim();
+						String cleanIp = stripScopeId(rawIp);
+						
+						// Strict offline IP-literal validation using Guava to prevent DNS name lookups or empty string resolution to loopback
+						if (!com.google.common.net.InetAddresses.isInetAddress(cleanIp))
+						{
+							logger.warn("Skipping invalid/unresolvable IP ban entry: {}", rawIp);
+							return;
+						}
+						
+						InetAddress addr = com.google.common.net.InetAddresses.forString(cleanIp);
+						this.ips.add(addr.getHostAddress());
+					});
+				}
 			}
 			this.loadOk = true;
 			logger.info("{} loaded with {} IP addresses", this.name, this.ips.size());
