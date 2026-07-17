@@ -15,7 +15,6 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -96,25 +95,13 @@ public class IpList
 			try
 			{
 				InetAddress target = InetAddress.getByName(cleanIp);
-				for (String ip : this.ips)
-				{
-					try
-					{
-						String cleanListedIp = stripScopeId(ip.trim());
-						InetAddress addr = InetAddress.getByName(cleanListedIp);
-						if (Arrays.equals(target.getAddress(), addr.getAddress()))
-						{
-							return true;
-						}
-					}
-					catch (UnknownHostException ignored) {}
-				}
+				String normalized = target.getHostAddress();
+				return this.ips.contains(normalized);
 			}
 			catch (UnknownHostException e)
 			{
 				return this.ips.contains(cleanIp);
 			}
-			return false;
 		}
 	}
 
@@ -127,19 +114,11 @@ public class IpList
 			{
 				InetAddress addr = InetAddress.getByName(trimmed);
 				String normalized = addr.getHostAddress();
-				if (checkIp(normalized))
-				{
-					return false;
-				}
 				return this.ips.add(normalized);
 			}
 			catch (UnknownHostException e)
 			{
-				if (this.ips.contains(trimmed))
-				{
-					return false;
-				}
-				return this.ips.add(trimmed);
+				return false;
 			}
 		}
 	}
@@ -152,32 +131,13 @@ public class IpList
 			try
 			{
 				InetAddress target = InetAddress.getByName(trimmed);
-				String toRemove = null;
-				for (String ip : this.ips)
-				{
-					try
-					{
-						String cleanListedIp = stripScopeId(ip.trim());
-						InetAddress addr = InetAddress.getByName(cleanListedIp);
-						if (Arrays.equals(target.getAddress(), addr.getAddress()))
-						{
-							toRemove = ip;
-							break;
-						}
-					}
-					catch (UnknownHostException ignored) {}
-				}
-				if (toRemove != null)
-				{
-					this.ips.remove(toRemove);
-					return true;
-				}
+				String normalized = target.getHostAddress();
+				return this.ips.remove(normalized);
 			}
 			catch (UnknownHostException e)
 			{
 				return this.ips.remove(trimmed);
 			}
-			return false;
 		}
 	}
 
@@ -221,7 +181,19 @@ public class IpList
 			this.ips.clear();
 			if (options != null && options.get("ips") instanceof List<?> list)
 			{
-				list.forEach(entry -> this.ips.add(entry.toString().trim()));
+				list.forEach(entry -> {
+					String rawIp = entry.toString().trim();
+					String cleanIp = stripScopeId(rawIp);
+					try
+					{
+						InetAddress addr = InetAddress.getByName(cleanIp);
+						this.ips.add(addr.getHostAddress());
+					}
+					catch (UnknownHostException e)
+					{
+						logger.warn("Skipping invalid/unresolvable IP ban entry: {}", rawIp);
+					}
+				});
 			}
 			this.loadOk = true;
 			logger.info("{} loaded with {} IP addresses", this.name, this.ips.size());
