@@ -17,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -179,7 +180,7 @@ public class PlayerList implements YamlStoredList<PlayerList>
 	}
 
 	@Override
-	@SuppressWarnings({"unchecked", "rawtypes"})
+	@SuppressWarnings("unchecked")
 	public void load(Logger logger) throws IOException
 	{
 		Map<String, Object> options = Maps.newHashMap();
@@ -190,49 +191,91 @@ public class PlayerList implements YamlStoredList<PlayerList>
 		synchronized (this.lock)
 		{
 			this.names.clear();
-			if (options != null && options.get("names") instanceof List list)
+			this.uuids.clear();
+			int skipped = 0;
+
+			// A present but non-list value means the file is structurally corrupt. Fail the whole load
+			// so a reload keeps the previous state, instead of silently replacing the list with an empty one
+			Object namesVal = options != null ? options.get("names") : null;
+			if (namesVal != null)
 			{
-				list.forEach(entry -> this.names.add(entry.toString()));
+				if (!(namesVal instanceof List<?> namesList))
+				{
+					throw new IOException("The 'names' field in the file is malformed (not a YAML list)");
+				}
+				for (Object entry : namesList)
+				{
+					if (entry == null)
+					{
+						logger.warn("Skipping null/empty player name entry");
+						skipped++;
+						continue;
+					}
+					this.names.add(entry.toString());
+				}
 			}
 
-			this.uuids.clear();
-			if (options != null && options.get("uuids") instanceof List list)
+			Object uuidsVal = options != null ? options.get("uuids") : null;
+			if (uuidsVal != null)
 			{
-				list.forEach(item -> {
+				if (!(uuidsVal instanceof List<?> uuidsList))
+				{
+					throw new IOException("The 'uuids' field in the file is malformed (not a YAML list)");
+				}
+				for (Object item : uuidsList)
+				{
 					if (item instanceof String s)
 					{
-						UuidUtils.tryParseUuid(s).ifPresentOrElse(
-								uuid -> this.uuids.put(uuid, null),
-								() -> logger.warn("Skipping invalid UUID \"{}\"", s)
-						);
+						Optional<UUID> uuid = UuidUtils.tryParseUuid(s);
+						if (uuid.isPresent())
+						{
+							this.uuids.put(uuid.get(), null);
+						}
+						else
+						{
+							logger.warn("Skipping invalid UUID \"{}\"", s);
+							skipped++;
+						}
 					}
 					else if (item instanceof Map<?, ?> map)
 					{
 						if (map.size() != 1)
 						{
 							logger.warn("Skipping invalid map item with size {}", map.size());
+							skipped++;
+							continue;
+						}
+						Map.Entry<?, ?> entry = map.entrySet().iterator().next();
+						if (entry.getKey() instanceof String s && (entry.getValue() instanceof String || entry.getValue() == null))
+						{
+							String name = (String)entry.getValue();
+							Optional<UUID> uuid = UuidUtils.tryParseUuid(s);
+							if (uuid.isPresent())
+							{
+								this.uuids.put(uuid.get(), name);
+							}
+							else
+							{
+								logger.warn("Skipping invalid UUID \"{}\" ({})", s, name);
+								skipped++;
+							}
 						}
 						else
 						{
-							Map.Entry<?, ?> entry = map.entrySet().iterator().next();
-							if (entry.getKey() instanceof String s && (entry.getValue() instanceof String || entry.getValue() == null))
-							{
-								String name = (String)entry.getValue();
-								UuidUtils.tryParseUuid(s).ifPresentOrElse(
-										uuid -> this.uuids.put(uuid, name),
-										() -> logger.warn("Skipping invalid UUID \"{}\" ({})", s, name)
-								);
-							}
+							logger.warn("Skipping invalid UUID list item {}", item);
+							skipped++;
 						}
 					}
 					else
 					{
 						logger.warn("Skipping invalid UUID list item {}", item);
+						skipped++;
 					}
-				});
+				}
 			}
 
 			this.loadOk = true;
+			YamlStoredList.logSkippedEntries(logger, this.name, skipped);
 			logger.info("{} loaded with {} names and {} uuids", this.name, this.names.size(), this.uuids.size());
 		}
 	}
