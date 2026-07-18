@@ -11,18 +11,20 @@ import org.yaml.snakeyaml.Yaml;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.Map;
 
 public class Configuration
 {
 	private static final int CONFIG_VERSION = 2;
 
-	private final Map<String, Object> options = Maps.newConcurrentMap();
+	// Replaced atomically on every (re)load, so login-time readers never observe a partially populated config
+	private volatile Map<String, Object> options = Collections.emptyMap();
 	private final Logger logger;
 	private final Path configFilePath;
 	private final Supplier<Boolean> proxyOnlineModeGetter;
 
-	private IdentifyMode identifyMode = IdentifyMode.DEFAULT;
+	private volatile IdentifyMode identifyMode = IdentifyMode.DEFAULT;
 
 	public Configuration(Logger logger, Path configFilePath, Supplier<Boolean> proxyOnlineModeGetter)
 	{
@@ -34,17 +36,18 @@ public class Configuration
 	@SuppressWarnings("unchecked")
 	public void load(String yamlContent)
 	{
-		// Parse before touching the active options, so a malformed config
-		// during a reload keeps the previous state enforced instead of disabling everything
-		Map<String, Object> loadedOptions = new Yaml().loadAs(yamlContent, this.options.getClass());
+		// Parse and migrate into a staging map before publishing, so a malformed config during a reload
+		// keeps the previous state enforced, and concurrent logins never see a half-built option set
+		Map<String, Object> loadedOptions = (Map<String, Object>)new Yaml().load(yamlContent);
 
-		this.options.clear();
+		Map<String, Object> stagedOptions = Maps.newLinkedHashMap();
 		if (loadedOptions != null)  // an empty config file parses to null
 		{
-			this.options.putAll(loadedOptions);
+			stagedOptions.putAll(loadedOptions);
 		}
-		this.migrate();
+		stagedOptions = this.migrate(stagedOptions);
 
+		this.options = Collections.unmodifiableMap(stagedOptions);
 		this.identifyMode = this.makeIdentifyMode();
 		this.warnAboutRiskyOptions();
 	}
@@ -56,25 +59,28 @@ public class Configuration
 	}
 
 	/**
-	 * Returns the current value of the given option, or the given default if the option is absent
+	 * Returns the value of the given option in the given map, or the given default if the option is absent
 	 */
-	private Object option(String key, Object defaultValue)
+	private static Object option(Map<String, Object> options, String key, Object defaultValue)
 	{
-		Object value = this.options.get(key);
+		Object value = options.get(key);
 		return value != null ? value : defaultValue;
 	}
 
-	private void migrate()
+	/**
+	 * Migrates the given staging options to the current config version, returning the map to publish
+	 */
+	private Map<String, Object> migrate(Map<String, Object> options)
 	{
-		Object versionObj = this.options.get("_version");  // key used by config v1
+		Object versionObj = options.get("_version");  // key used by config v1
 		if (versionObj == null)
 		{
-			versionObj = this.options.get("version");
+			versionObj = options.get("version");
 		}
 		int version = versionObj instanceof Number number ? number.intValue() : 0;
 		if (version >= CONFIG_VERSION)
 		{
-			return;
+			return options;
 		}
 
 		this.logger.warn("Migrating config file from {} to v{}", version == 0 ? "a legacy version" : "v" + version, CONFIG_VERSION);
@@ -85,32 +91,30 @@ public class Configuration
 		// uuid is the default for newly generated configs only.
 		Map<String, Object> newOptions = Maps.newLinkedHashMap();
 		newOptions.put("version", CONFIG_VERSION);
-		newOptions.put("identify_mode", this.option("identify_mode", "name"));
-		newOptions.put("whitelist_enabled", this.option("whitelist_enabled", this.option("enabled", true)));
-		newOptions.put("whitelist_kick_message", this.option("whitelist_kick_message", this.option("kick_message", "You are not in the whitelist!")));
-		newOptions.put("blacklist_enabled", this.option("blacklist_enabled", this.option("enabled", true)));
-		newOptions.put("blacklist_kick_message", this.option("blacklist_kick_message", "You are banned from the server!"));
-		newOptions.put("ipban_enabled", this.option("ipban_enabled", true));
-		newOptions.put("ipban_kick_message", this.option("ipban_kick_message", "Your IP address is banned from the server!"));
+		newOptions.put("identify_mode", option(options, "identify_mode", "name"));
+		newOptions.put("whitelist_enabled", option(options, "whitelist_enabled", option(options, "enabled", true)));
+		newOptions.put("whitelist_kick_message", option(options, "whitelist_kick_message", option(options, "kick_message", "You are not in the whitelist!")));
+		newOptions.put("blacklist_enabled", option(options, "blacklist_enabled", option(options, "enabled", true)));
+		newOptions.put("blacklist_kick_message", option(options, "blacklist_kick_message", "You are banned from the server!"));
+		newOptions.put("ipban_enabled", option(options, "ipban_enabled", true));
+		newOptions.put("ipban_kick_message", option(options, "ipban_kick_message", "Your IP address is banned from the server!"));
 
-		Object blacklistOnIpBanJoin = this.options.get("blacklist_on_ipban_join");
+		Object blacklistOnIpBanJoin = options.get("blacklist_on_ipban_join");
 		if (blacklistOnIpBanJoin == null)
 		{
 			blacklistOnIpBanJoin = this.defaultBlacklistOnIpBanJoin();
 		}
 		newOptions.put("blacklist_on_ipban_join", blacklistOnIpBanJoin);
 
-		this.options.clear();
-		this.options.putAll(newOptions);
 		try
 		{
-			// this.options is a concurrent map and does not preserve insertion order, so dump the ordered map
 			FileUtils.dumpYaml(this.configFilePath, newOptions);
 		}
 		catch (IOException e)
 		{
 			this.logger.warn("Could not save the migrated configuration file", e);
 		}
+		return newOptions;
 	}
 
 	private boolean defaultBlacklistOnIpBanJoin()
