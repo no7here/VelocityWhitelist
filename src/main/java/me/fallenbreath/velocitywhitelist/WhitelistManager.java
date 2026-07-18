@@ -410,7 +410,7 @@ public class WhitelistManager
 		for (Player player : this.server.getAllPlayers())
 		{
 			InetSocketAddress address = player.getRemoteAddress();
-			if (address != null)
+			if (address != null && address.getAddress() != null)  // getAddress() is null for unresolved socket addresses
 			{
 				String ipString = address.getAddress().getHostAddress();
 				if (this.ipBanList.checkIp(ipString))
@@ -429,7 +429,7 @@ public class WhitelistManager
 		InetSocketAddress remoteAddress = player.getRemoteAddress();
 
 		// 1. Evaluate IP ban list FIRST
-		if (this.ipBanList.isActivated() && remoteAddress != null)
+		if (this.ipBanList.isActivated() && remoteAddress != null && remoteAddress.getAddress() != null)  // getAddress() is null for unresolved socket addresses
 		{
 			String ipString = remoteAddress.getAddress().getHostAddress();
 			if (this.ipBanList.checkIp(ipString))
