@@ -41,7 +41,7 @@ public class VelocityWhitelistPlugin
 		this.logger = logger;
 		this.dataDirectory = dataDirectory;
 		this.configFilePath = dataDirectory.resolve("config.yml");
-		this.config = new Configuration(this.logger, this.configFilePath);
+		this.config = new Configuration(this.logger, this.configFilePath, () -> server.getConfiguration().isOnlineMode());
 		this.whitelistManager = new WhitelistManager(logger, this.config, this.dataDirectory, this.server);
 	}
 
