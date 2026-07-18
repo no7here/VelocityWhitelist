@@ -1,5 +1,6 @@
 package me.fallenbreath.velocitywhitelist.config;
 
+import com.google.common.base.Supplier;
 import com.google.common.collect.Maps;
 import me.fallenbreath.velocitywhitelist.IdentifyMode;
 import me.fallenbreath.velocitywhitelist.PluginMeta;
@@ -11,30 +12,38 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
-import java.util.Optional;
 
 public class Configuration
 {
+	private static final int CONFIG_VERSION = 2;
+
 	private final Map<String, Object> options = Maps.newConcurrentMap();
 	private final Logger logger;
 	private final Path configFilePath;
+	private final Supplier<Boolean> proxyOnlineModeGetter;
 
 	private IdentifyMode identifyMode = IdentifyMode.DEFAULT;
 
-	public Configuration(Logger logger, Path configFilePath)
+	public Configuration(Logger logger, Path configFilePath, Supplier<Boolean> proxyOnlineModeGetter)
 	{
 		this.logger = logger;
 		this.configFilePath = configFilePath;
+		this.proxyOnlineModeGetter = proxyOnlineModeGetter;
 	}
 
 	@SuppressWarnings("unchecked")
 	public void load(String yamlContent)
 	{
 		this.options.clear();
-		this.options.putAll(new Yaml().loadAs(yamlContent, this.options.getClass()));
+		Map<String, Object> loadedOptions = new Yaml().loadAs(yamlContent, this.options.getClass());
+		if (loadedOptions != null)  // an empty config file parses to null
+		{
+			this.options.putAll(loadedOptions);
+		}
 		this.migrate();
 
 		this.identifyMode = this.makeIdentifyMode();
+		this.warnAboutRiskyOptions();
 	}
 
 	public void reload() throws IOException
@@ -43,77 +52,87 @@ public class Configuration
 		this.load(content);
 	}
 
+	/**
+	 * Returns the current value of the given option, or the given default if the option is absent
+	 */
+	private Object option(String key, Object defaultValue)
+	{
+		Object value = this.options.get(key);
+		return value != null ? value : defaultValue;
+	}
+
 	private void migrate()
 	{
-		boolean migrated = false;
-		Object versionObj = this.options.get("_version");
+		Object versionObj = this.options.get("_version");  // key used by config v1
 		if (versionObj == null)
 		{
 			versionObj = this.options.get("version");
 		}
-
-		if (versionObj == null)
+		int version = versionObj instanceof Number number ? number.intValue() : 0;
+		if (version >= CONFIG_VERSION)
 		{
-			// migrate pre-v0.3/v1 -> v2
-			this.logger.warn("Migrating config file from legacy version");
-			this.logger.warn("Please read the documentation for more information: {}", PluginMeta.REPOSITORY_URL);
-
-			Map<String, Object> newOptions = Maps.newLinkedHashMap();
-			newOptions.put("version", 2);
-			newOptions.put("identify_mode", Optional.ofNullable(this.options.get("identify_mode")).orElse("name"));
-			newOptions.put("whitelist_enabled", Optional.ofNullable(this.options.get("whitelist_enabled")).orElse(Optional.ofNullable(this.options.get("enabled")).orElse(true)));
-			newOptions.put("whitelist_kick_message", Optional.ofNullable(this.options.get("whitelist_kick_message")).orElse(Optional.ofNullable(this.options.get("kick_message")).orElse("You are not in the whitelist!")));
-			newOptions.put("blacklist_enabled", Optional.ofNullable(this.options.get("blacklist_enabled")).orElse(Optional.ofNullable(this.options.get("enabled")).orElse(true)));
-			newOptions.put("blacklist_kick_message", Optional.ofNullable(this.options.get("blacklist_kick_message")).orElse("You are banned from the server!"));
-			
-			// IP bans options
-			newOptions.put("ipban_enabled", Optional.ofNullable(this.options.get("ipban_enabled")).orElse(true));
-			newOptions.put("ipban_kick_message", Optional.ofNullable(this.options.get("ipban_kick_message")).orElse("Your IP address is banned from the server!"));
-			newOptions.put("blacklist_on_ipban_join", Optional.ofNullable(this.options.get("blacklist_on_ipban_join")).orElse(true));
-
-			this.options.clear();
-			this.options.putAll(newOptions);
-			migrated = true;
-		}
-		else if (versionObj instanceof Number && ((Number)versionObj).intValue() == 1)
-		{
-			// migrate v1 -> v2
-			this.logger.warn("Migrating config file from v1 to v2");
-
-			Map<String, Object> newOptions = Maps.newLinkedHashMap();
-			newOptions.put("version", 2);
-			newOptions.put("identify_mode", Optional.ofNullable(this.options.get("identify_mode")).orElse("uuid"));
-			newOptions.put("whitelist_enabled", Optional.ofNullable(this.options.get("whitelist_enabled")).orElse(true));
-			newOptions.put("whitelist_kick_message", Optional.ofNullable(this.options.get("whitelist_kick_message")).orElse("You are not in the whitelist!"));
-			newOptions.put("blacklist_enabled", Optional.ofNullable(this.options.get("blacklist_enabled")).orElse(true));
-			newOptions.put("blacklist_kick_message", Optional.ofNullable(this.options.get("blacklist_kick_message")).orElse("You are banned from the server!"));
-			
-			// IP bans options
-			newOptions.put("ipban_enabled", Optional.ofNullable(this.options.get("ipban_enabled")).orElse(true));
-			newOptions.put("ipban_kick_message", Optional.ofNullable(this.options.get("ipban_kick_message")).orElse("Your IP address is banned from the server!"));
-			newOptions.put("blacklist_on_ipban_join", Optional.ofNullable(this.options.get("blacklist_on_ipban_join")).orElse(true));
-
-			this.options.clear();
-			this.options.putAll(newOptions);
-			migrated = true;
+			return;
 		}
 
-		if (migrated)
+		this.logger.warn("Migrating config file from {} to v{}", version == 0 ? "a legacy version" : "v" + version, CONFIG_VERSION);
+		this.logger.warn("Please read the documentation for more information: {}", PluginMeta.REPOSITORY_URL);
+
+		// Configs from before the uuid default switch behaved as name mode when identify_mode was absent,
+		// so "name" must stay the fallback here, or migration would silently stop name-based lists from matching.
+		// uuid is the default for newly generated configs only.
+		Map<String, Object> newOptions = Maps.newLinkedHashMap();
+		newOptions.put("version", CONFIG_VERSION);
+		newOptions.put("identify_mode", this.option("identify_mode", "name"));
+		newOptions.put("whitelist_enabled", this.option("whitelist_enabled", this.option("enabled", true)));
+		newOptions.put("whitelist_kick_message", this.option("whitelist_kick_message", this.option("kick_message", "You are not in the whitelist!")));
+		newOptions.put("blacklist_enabled", this.option("blacklist_enabled", this.option("enabled", true)));
+		newOptions.put("blacklist_kick_message", this.option("blacklist_kick_message", "You are banned from the server!"));
+		newOptions.put("ipban_enabled", this.option("ipban_enabled", true));
+		newOptions.put("ipban_kick_message", this.option("ipban_kick_message", "Your IP address is banned from the server!"));
+
+		Object blacklistOnIpBanJoin = this.options.get("blacklist_on_ipban_join");
+		if (blacklistOnIpBanJoin == null)
 		{
-			try
-			{
-				this.save();
-			}
-			catch (IOException e)
-			{
-				this.logger.warn("Could not save the configuration file", e);
-			}
+			blacklistOnIpBanJoin = this.defaultBlacklistOnIpBanJoin();
+		}
+		newOptions.put("blacklist_on_ipban_join", blacklistOnIpBanJoin);
+
+		this.options.clear();
+		this.options.putAll(newOptions);
+		try
+		{
+			// this.options is a concurrent map and does not preserve insertion order, so dump the ordered map
+			FileUtils.dumpYaml(this.configFilePath, newOptions);
+		}
+		catch (IOException e)
+		{
+			this.logger.warn("Could not save the migrated configuration file", e);
 		}
 	}
 
-	private void save() throws IOException
+	private boolean defaultBlacklistOnIpBanJoin()
 	{
-		FileUtils.dumpYaml(this.configFilePath, this.options);
+		if (this.isProxyOnlineMode())
+		{
+			return true;
+		}
+		this.logger.warn("Detected that the proxy is running in offline mode - blacklist on IP ban was automatically disabled to prevent griefing");
+		this.logger.warn("Check the config comments / README on GitHub for more information: {}", PluginMeta.REPOSITORY_URL);
+		return false;
+	}
+
+	private void warnAboutRiskyOptions()
+	{
+		if (this.isBlacklistOnIpBanJoin() && !this.isProxyOnlineMode())
+		{
+			this.logger.warn("blacklist_on_ipban_join is enabled, but the proxy is running in offline mode!");
+			this.logger.warn("In offline mode player identities are not verified, so anyone joining from a banned IP can get an arbitrary player name blacklisted. See the config comments / README for more information");
+		}
+	}
+
+	private boolean isProxyOnlineMode()
+	{
+		return this.proxyOnlineModeGetter.get();
 	}
 
 	private IdentifyMode makeIdentifyMode()
@@ -180,30 +199,30 @@ public class Configuration
 
 	public String getWhitelistKickMessage()
 	{
-		Object maxPlayer = this.options.get("whitelist_kick_message");
-		if (maxPlayer instanceof String)
+		Object message = this.options.get("whitelist_kick_message");
+		if (message instanceof String)
 		{
-			return (String)maxPlayer;
+			return (String)message;
 		}
 		return "You are not in the whitelist!";
 	}
 
 	public String getBlacklistKickMessage()
 	{
-		Object maxPlayer = this.options.get("blacklist_kick_message");
-		if (maxPlayer instanceof String)
+		Object message = this.options.get("blacklist_kick_message");
+		if (message instanceof String)
 		{
-			return (String)maxPlayer;
+			return (String)message;
 		}
 		return "You are banned from the server!";
 	}
 
 	public String getIpBanKickMessage()
 	{
-		Object msg = this.options.get("ipban_kick_message");
-		if (msg instanceof String)
+		Object message = this.options.get("ipban_kick_message");
+		if (message instanceof String)
 		{
-			return (String)msg;
+			return (String)message;
 		}
 		return "Your IP address is banned from the server!";
 	}
