@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-public class PlayerList
+public class PlayerList implements YamlStoredList<PlayerList>
 {
 	private final Set<String> names = Sets.newLinkedHashSet();
 	private final Map<UUID, @Nullable String> uuids = Maps.newLinkedHashMap();
@@ -37,11 +37,13 @@ public class PlayerList
 		this.configEnableGetter = configEnableGetter;
 	}
 
+	@Override
 	public String getName()
 	{
 		return this.name;
 	}
 
+	@Override
 	public Path getFilePath()
 	{
 		return this.filePath;
@@ -57,18 +59,12 @@ public class PlayerList
 
 	public boolean isConfigEnabled()
 	{
-		synchronized (this.lock)
-		{
-			return this.configEnableGetter.get();
-		}
+		return this.configEnableGetter.get();
 	}
 
 	public boolean isActivated()
 	{
-		synchronized (this.lock)
-		{
-			return this.isLoadOk() && this.isConfigEnabled();
-		}
+		return this.isLoadOk() && this.isConfigEnabled();
 	}
 
 	public ImmutableList<String> getPlayerNames()
@@ -119,48 +115,27 @@ public class PlayerList
 		}
 	}
 
-	public boolean updatePlayerUuidName(UUID uuid, @NotNull String currentName)
+	/**
+	 * A snapshot of one uuid mapping. {@code exists} is needed alongside the name,
+	 * since a stored uuid may legally map to a null name (bare uuid entry in the yaml file)
+	 */
+	public record UuidEntry(boolean exists, @Nullable String name)
+	{
+	}
+
+	public UuidEntry peekPlayerUUID(UUID uuid)
 	{
 		synchronized (this.lock)
 		{
-			if (this.uuids.containsKey(uuid))
-			{
-				String oldName = this.uuids.get(uuid);
-				if (!currentName.equals(oldName))
-				{
-					this.uuids.put(uuid, currentName);
-					return true;
-				}
-			}
-			return false;
+			return new UuidEntry(this.uuids.containsKey(uuid), this.uuids.get(uuid));
 		}
 	}
 
-	public static class PlayerUUIDComputeResult<T>
-	{
-		public boolean addNewValue = false;
-		public @Nullable String newValue = null;
-		public T ret = null;
-	}
-
-	@FunctionalInterface
-	public interface PlayerUUIDComputeFunction<T>
-	{
-		PlayerUUIDComputeResult<T> compute(boolean exists, @Nullable String oldName);
-	}
-
-	public <T> T computePlayerUUID(UUID uuid, PlayerUUIDComputeFunction<T> func)
+	public void putPlayerUUID(UUID uuid, @Nullable String playerName)
 	{
 		synchronized (this.lock)
 		{
-			boolean exists = this.uuids.containsKey(uuid);
-			String oldName = this.uuids.get(uuid);
-			PlayerUUIDComputeResult<T> result = func.compute(exists, oldName);
-			if (result.addNewValue)
-			{
-				this.uuids.put(uuid, result.newValue);
-			}
-			return result.ret;
+			this.uuids.put(uuid, playerName);
 		}
 	}
 
@@ -172,6 +147,7 @@ public class PlayerList
 		}
 	}
 
+	@Override
 	public void resetTo(@NotNull PlayerList newList)
 	{
 		synchronized (this.lock)
@@ -196,11 +172,13 @@ public class PlayerList
 		}
 	}
 
+	@Override
 	public PlayerList createNewEmptyList()
 	{
 		return new PlayerList(this.name, this.filePath, this.configEnableGetter);
 	}
 
+	@Override
 	@SuppressWarnings({"unchecked", "rawtypes"})
 	public void load(Logger logger) throws IOException
 	{
@@ -259,6 +237,7 @@ public class PlayerList
 		}
 	}
 
+	@Override
 	public void save() throws IOException
 	{
 		Map<String, Object> options = Maps.newLinkedHashMap();
