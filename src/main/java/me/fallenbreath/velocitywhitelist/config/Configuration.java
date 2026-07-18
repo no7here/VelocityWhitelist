@@ -116,9 +116,18 @@ public class Configuration
 		{
 			return true;
 		}
-		this.logger.warn("Detected that the proxy is running in offline mode - blacklist on IP ban was automatically disabled to prevent griefing");
-		this.logger.warn("Check the config comments / README on GitHub for more information: {}", PluginMeta.REPOSITORY_URL);
+		logOfflineModeAutoDisable(this.logger);
 		return false;
+	}
+
+	/**
+	 * Shared warning for the two places that flip blacklist_on_ipban_join off for offline-mode proxies:
+	 * config migration, and fresh config generation in the plugin bootstrap
+	 */
+	public static void logOfflineModeAutoDisable(Logger logger)
+	{
+		logger.warn("Detected that the proxy is running in offline mode - blacklist on IP ban was automatically disabled to prevent griefing");
+		logger.warn("Check the config comments / README on GitHub for more information: {}", PluginMeta.REPOSITORY_URL);
 	}
 
 	private void warnAboutRiskyOptions()
