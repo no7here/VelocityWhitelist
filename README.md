@@ -42,8 +42,16 @@ ipban_enabled: true
 # Message sent to players who join on a banned IP address
 ipban_kick_message: Your IP address is banned from the server!
 # Controls whether players should be automatically blacklisted when they try join on a banned IP
+# WARNING: Recommended for online-mode proxies only. In offline mode, player identities are not verified, so anyone joining from a banned IP can get any player name blacklisted, allowing griefing of innocent players. 
 blacklist_on_ipban_join: true
 ```
+
+> [!WARNING]
+> `blacklist_on_ipban_join` should NOT be enabled on offline-mode proxies.
+> 
+> In offline mode, player identities aren't verified by Mojang, so anyone connecting from a banned IP can set *any* player name and get it blacklisted, allowing attackers to grief innocent players.
+>
+> When migrating an old config, the plugin detects if the server is in offline mode and disables this option automatically. If it's enabled on an offline-mode proxy, a warning message will be printed on startup.
 
 #### 📁 Whitelist & Blacklist
 `plugins/velocitywhitelist/whitelist.yml` // `plugins/velocitywhitelist/blacklist.yml`
