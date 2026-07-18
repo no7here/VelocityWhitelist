@@ -5,21 +5,21 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.google.common.net.InetAddresses;
 import me.fallenbreath.velocitywhitelist.utils.FileUtils;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
-public class IpList
+public class IpList implements YamlStoredList<IpList>
 {
 	private final Set<String> ips = Sets.newLinkedHashSet();
 	private final String name;
@@ -35,11 +35,13 @@ public class IpList
 		this.configEnableGetter = configEnableGetter;
 	}
 
+	@Override
 	public String getName()
 	{
 		return this.name;
 	}
 
+	@Override
 	public Path getFilePath()
 	{
 		return this.filePath;
@@ -55,18 +57,12 @@ public class IpList
 
 	public boolean isConfigEnabled()
 	{
-		synchronized (this.lock)
-		{
-			return this.configEnableGetter.get();
-		}
+		return this.configEnableGetter.get();
 	}
 
 	public boolean isActivated()
 	{
-		synchronized (this.lock)
-		{
-			return this.isLoadOk() && this.isConfigEnabled();
-		}
+		return this.isLoadOk() && this.isConfigEnabled();
 	}
 
 	public ImmutableList<String> getIps()
@@ -80,82 +76,64 @@ public class IpList
 	private static String stripScopeId(String ip)
 	{
 		int pct = ip.indexOf('%');
-		if (pct != -1)
+		return pct != -1 ? ip.substring(0, pct) : ip;
+	}
+
+	/**
+	 * Strictly parses an IP literal (IPv4 or IPv6, optionally with a %scope suffix)
+	 * into its canonical textual form, e.g. "2001:DB8::1" -> "2001:db8:0:0:0:0:0:1".
+	 * Returns empty for anything else (hostnames, malformed input), so no DNS lookup can ever happen
+	 */
+	public static Optional<String> normalizeIpLiteral(String ipStr)
+	{
+		String cleanIp = stripScopeId(ipStr.trim());
+		if (InetAddresses.isInetAddress(cleanIp))
 		{
-			return ip.substring(0, pct);
+			return Optional.of(InetAddresses.forString(cleanIp).getHostAddress());
 		}
-		return ip;
+		return Optional.empty();
 	}
 
 	public boolean checkIp(String ipStr)
 	{
+		Optional<String> normalized = normalizeIpLiteral(ipStr);
+		if (normalized.isEmpty())
+		{
+			return false;
+		}
 		synchronized (this.lock)
 		{
-			String cleanIp = stripScopeId(ipStr.trim());
-			if (com.google.common.net.InetAddresses.isInetAddress(cleanIp))
-			{
-				InetAddress target = com.google.common.net.InetAddresses.forString(cleanIp);
-				return this.ips.contains(target.getHostAddress());
-			}
-			try
-			{
-				InetAddress target = InetAddress.getByName(cleanIp);
-				String normalized = target.getHostAddress();
-				return this.ips.contains(normalized);
-			}
-			catch (UnknownHostException e)
-			{
-				return this.ips.contains(cleanIp);
-			}
+			return this.ips.contains(normalized.get());
 		}
 	}
 
 	public boolean addIp(String ipStr)
 	{
+		Optional<String> normalized = normalizeIpLiteral(ipStr);
+		if (normalized.isEmpty())
+		{
+			return false;
+		}
 		synchronized (this.lock)
 		{
-			String trimmed = stripScopeId(ipStr.trim());
-			if (com.google.common.net.InetAddresses.isInetAddress(trimmed))
-			{
-				InetAddress addr = com.google.common.net.InetAddresses.forString(trimmed);
-				return this.ips.add(addr.getHostAddress());
-			}
-			try
-			{
-				InetAddress addr = InetAddress.getByName(trimmed);
-				String normalized = addr.getHostAddress();
-				return this.ips.add(normalized);
-			}
-			catch (UnknownHostException e)
-			{
-				return false;
-			}
+			return this.ips.add(normalized.get());
 		}
 	}
 
 	public boolean removeIp(String ipStr)
 	{
+		Optional<String> normalized = normalizeIpLiteral(ipStr);
+		if (normalized.isEmpty())
+		{
+			return false;
+		}
 		synchronized (this.lock)
 		{
-			String trimmed = stripScopeId(ipStr.trim());
-			if (com.google.common.net.InetAddresses.isInetAddress(trimmed))
-			{
-				InetAddress target = com.google.common.net.InetAddresses.forString(trimmed);
-				return this.ips.remove(target.getHostAddress());
-			}
-			try
-			{
-				InetAddress target = InetAddress.getByName(trimmed);
-				String normalized = target.getHostAddress();
-				return this.ips.remove(normalized);
-			}
-			catch (UnknownHostException e)
-			{
-				return this.ips.remove(trimmed);
-			}
+			return this.ips.remove(normalized.get());
 		}
 	}
 
+	@Override
 	public void resetTo(@NotNull IpList newList)
 	{
 		synchronized (this.lock)
@@ -178,11 +156,13 @@ public class IpList
 		}
 	}
 
+	@Override
 	public IpList createNewEmptyList()
 	{
 		return new IpList(this.name, this.filePath, this.configEnableGetter);
 	}
 
+	@Override
 	@SuppressWarnings("unchecked")
 	public void load(Logger logger) throws IOException
 	{
@@ -209,18 +189,11 @@ public class IpList
 							logger.warn("Skipping null/empty IP ban entry");
 							return;
 						}
-						String rawIp = entry.toString().trim();
-						String cleanIp = stripScopeId(rawIp);
-						
-						// Strict offline IP-literal validation using Guava to prevent DNS name lookups or empty string resolution to loopback
-						if (!com.google.common.net.InetAddresses.isInetAddress(cleanIp))
-						{
-							logger.warn("Skipping invalid/unresolvable IP ban entry: {}", rawIp);
-							return;
-						}
-						
-						InetAddress addr = com.google.common.net.InetAddresses.forString(cleanIp);
-						this.ips.add(addr.getHostAddress());
+						String rawIp = entry.toString();
+						normalizeIpLiteral(rawIp).ifPresentOrElse(
+								this.ips::add,
+								() -> logger.warn("Skipping invalid IP ban entry: {}", rawIp)
+						);
 					});
 				}
 			}
@@ -229,6 +202,7 @@ public class IpList
 		}
 	}
 
+	@Override
 	public void save() throws IOException
 	{
 		Map<String, Object> options = Maps.newLinkedHashMap();
