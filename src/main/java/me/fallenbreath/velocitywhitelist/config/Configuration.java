@@ -34,8 +34,11 @@ public class Configuration
 	@SuppressWarnings("unchecked")
 	public void load(String yamlContent)
 	{
-		this.options.clear();
+		// Parse before touching the active options, so a malformed config
+		// during a reload keeps the previous state enforced instead of disabling everything
 		Map<String, Object> loadedOptions = new Yaml().loadAs(yamlContent, this.options.getClass());
+
+		this.options.clear();
 		if (loadedOptions != null)  // an empty config file parses to null
 		{
 			this.options.putAll(loadedOptions);
