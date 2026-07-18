@@ -11,7 +11,7 @@ import net.kyori.adventure.text.Component;
 import java.util.Optional;
 
 import static com.mojang.brigadier.arguments.StringArgumentType.getString;
-import static com.mojang.brigadier.arguments.StringArgumentType.string;
+import static com.mojang.brigadier.arguments.StringArgumentType.greedyString;
 import static me.fallenbreath.velocitywhitelist.command.CommandUtils.*;
 
 public class IpBanCommand
@@ -32,12 +32,14 @@ public class IpBanCommand
 				requires(s -> s.hasPermission(PluginMeta.ID + ".command")).
 				executes(c -> showStatus(c.getSource())).
 				then(literal("add").
-						then(argument("ip", string()).
+						// greedyString instead of string/word: brigadier's unquoted strings cannot contain ':',
+						// so IPv6 addresses would otherwise require quoting to parse
+						then(argument("ip", greedyString()).
 								executes(c -> addIp(c.getSource(), getString(c, "ip")))
 						)
 				).
 				then(literal("remove").
-						then(argument("ip", string()).
+						then(argument("ip", greedyString()).
 								suggests((c, sb) -> suggestMatching(this.manager.getIpBanList().getIps(), sb)).
 								executes(c -> removeIp(c.getSource(), getString(c, "ip")))
 						)
@@ -49,13 +51,16 @@ public class IpBanCommand
 						executes(c -> reloadList(c.getSource()))
 				);
 
-		commandManager.register(new BrigadierCommand(root.build()));
+		var rootNode = root.build();
+		commandManager.register(new BrigadierCommand(rootNode));
 
 		for (int i = 1; i < roots.length; i++)
 		{
 			var alternative = literal(roots[i]).
 					requires(s -> s.hasPermission(PluginMeta.ID + ".command")).
-					redirect(root.build());
+					// a bare redirect node is not executable in brigadier, so the alias needs its own executes
+					executes(c -> showStatus(c.getSource())).
+					redirect(rootNode);
 
 			commandManager.register(new BrigadierCommand(alternative.build()));
 		}
