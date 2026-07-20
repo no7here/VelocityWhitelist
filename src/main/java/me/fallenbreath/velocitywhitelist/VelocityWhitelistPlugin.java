@@ -79,13 +79,6 @@ public class VelocityWhitelistPlugin
 			try (InputStream in = this.getClass().getClassLoader().getResourceAsStream("config.yml"))
 			{
 				String defaultConfig = new String(Objects.requireNonNull(in).readAllBytes(), StandardCharsets.UTF_8);
-				if (!this.server.getConfiguration().isOnlineMode())
-				{
-					// Offline-mode identities are unverified, so the bundled blacklist_on_ipban_join default
-					// is unsafe there (see README). Flip it off for fresh installs; admins can still enable it explicitly
-					defaultConfig = defaultConfig.replaceFirst("(?m)^blacklist_on_ipban_join:.*$", "blacklist_on_ipban_join: false");
-					Configuration.logOfflineModeAutoDisable(this.logger);
-				}
 				Files.writeString(file.toPath(), defaultConfig);
 			}
 			catch (Exception e)
