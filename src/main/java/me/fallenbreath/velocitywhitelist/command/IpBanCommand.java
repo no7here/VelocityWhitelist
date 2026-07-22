@@ -1,18 +1,21 @@
 package me.fallenbreath.velocitywhitelist.command;
 
+import static com.mojang.brigadier.arguments.StringArgumentType.getString;
+import static com.mojang.brigadier.arguments.StringArgumentType.greedyString;
+import static me.fallenbreath.velocitywhitelist.command.CommandUtils.argument;
+import static me.fallenbreath.velocitywhitelist.command.CommandUtils.literal;
+import static me.fallenbreath.velocitywhitelist.command.CommandUtils.suggestMatching;
+
+import java.util.Optional;
+
 import com.velocitypowered.api.command.BrigadierCommand;
 import com.velocitypowered.api.command.CommandManager;
 import com.velocitypowered.api.command.CommandSource;
+
 import me.fallenbreath.velocitywhitelist.PluginMeta;
 import me.fallenbreath.velocitywhitelist.WhitelistManager;
 import me.fallenbreath.velocitywhitelist.config.IpList;
 import net.kyori.adventure.text.Component;
-
-import java.util.Optional;
-
-import static com.mojang.brigadier.arguments.StringArgumentType.getString;
-import static com.mojang.brigadier.arguments.StringArgumentType.greedyString;
-import static me.fallenbreath.velocitywhitelist.command.CommandUtils.*;
 
 public class IpBanCommand
 {

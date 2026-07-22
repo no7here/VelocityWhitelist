@@ -1,8 +1,13 @@
 package me.fallenbreath.velocitywhitelist.command;
 
+import static me.fallenbreath.velocitywhitelist.command.CommandUtils.literal;
+
+import org.slf4j.Logger;
+
 import com.velocitypowered.api.command.BrigadierCommand;
 import com.velocitypowered.api.command.CommandManager;
 import com.velocitypowered.api.command.CommandSource;
+
 import me.fallenbreath.velocitywhitelist.PluginMeta;
 import me.fallenbreath.velocitywhitelist.WhitelistManager;
 import me.fallenbreath.velocitywhitelist.config.Configuration;
@@ -10,9 +15,6 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
-import org.slf4j.Logger;
-
-import static me.fallenbreath.velocitywhitelist.command.CommandUtils.literal;
 
 public class PluginControlCommand
 {

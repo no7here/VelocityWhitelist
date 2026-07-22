@@ -1,18 +1,20 @@
 package me.fallenbreath.velocitywhitelist.config;
 
-import com.google.common.base.Supplier;
-import com.google.common.collect.Maps;
-import me.fallenbreath.velocitywhitelist.IdentifyMode;
-import me.fallenbreath.velocitywhitelist.PluginMeta;
-import me.fallenbreath.velocitywhitelist.utils.FileUtils;
-import org.slf4j.Logger;
-import org.yaml.snakeyaml.Yaml;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.Map;
+
+import org.slf4j.Logger;
+import org.yaml.snakeyaml.Yaml;
+
+import com.google.common.base.Supplier;
+import com.google.common.collect.Maps;
+
+import me.fallenbreath.velocitywhitelist.IdentifyMode;
+import me.fallenbreath.velocitywhitelist.PluginMeta;
+import me.fallenbreath.velocitywhitelist.utils.FileUtils;
 
 public class Configuration
 {

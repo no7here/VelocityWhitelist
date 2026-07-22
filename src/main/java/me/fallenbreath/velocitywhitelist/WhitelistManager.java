@@ -1,5 +1,16 @@
 package me.fallenbreath.velocitywhitelist;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+
 import com.google.common.collect.Lists;
 import com.velocitypowered.api.command.CommandSource;
 import com.velocitypowered.api.event.ResultedEvent;
@@ -7,6 +18,7 @@ import com.velocitypowered.api.event.connection.LoginEvent;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.util.GameProfile;
+
 import me.fallenbreath.velocitywhitelist.config.Configuration;
 import me.fallenbreath.velocitywhitelist.config.IpList;
 import me.fallenbreath.velocitywhitelist.config.PlayerList;
@@ -15,16 +27,6 @@ import me.fallenbreath.velocitywhitelist.utils.MojangAPI;
 import me.fallenbreath.velocitywhitelist.utils.UuidUtils;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
-
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.nio.file.Path;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
 
 public class WhitelistManager
 {
@@ -41,11 +43,11 @@ public class WhitelistManager
 	private long lastAutoBlacklistReset = 0;
 	private int autoBlacklistCount = 0;
 	private static final int MAX_AUTO_BLACKLISTS_PER_WINDOW = 5;
-	private static final long RATE_LIMIT_WINDOW_MS = 10000; // 10 seconds
+	private static final long RATE_LIMIT_WINDOW_MS = 10000;
 
 	// Track the last time a rate-limited skip warning was printed to avoid spamming console
 	private long lastSkipWarningLogTime = 0;
-	private static final long SKIP_WARNING_LOG_COOLDOWN_MS = 5000; // 5 seconds
+	private static final long SKIP_WARNING_LOG_COOLDOWN_MS = 5000;
 
 	public WhitelistManager(Logger logger, Configuration config, Path dataDirectory, ProxyServer server)
 	{

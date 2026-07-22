@@ -1,9 +1,9 @@
 package me.fallenbreath.velocitywhitelist.config;
 
-import org.slf4j.Logger;
-
 import java.io.IOException;
 import java.nio.file.Path;
+
+import org.slf4j.Logger;
 
 /**
  * Common contract for the yaml-file-backed lists (player lists and IP lists),

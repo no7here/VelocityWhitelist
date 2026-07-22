@@ -1,17 +1,5 @@
 package me.fallenbreath.velocitywhitelist.config;
 
-import com.google.common.base.Supplier;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
-import me.fallenbreath.velocitywhitelist.utils.FileUtils;
-import me.fallenbreath.velocitywhitelist.utils.UuidUtils;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
-import org.yaml.snakeyaml.Yaml;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -20,6 +8,20 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.yaml.snakeyaml.Yaml;
+
+import com.google.common.base.Supplier;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
+
+import me.fallenbreath.velocitywhitelist.utils.FileUtils;
+import me.fallenbreath.velocitywhitelist.utils.UuidUtils;
 
 public class PlayerList implements YamlStoredList<PlayerList>
 {
