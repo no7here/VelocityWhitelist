@@ -1,14 +1,27 @@
-### 📄 VelocityWhitelist
-A fork of TISUnion's [VelocityWhitelist](https://github.com/TISUnion/VelocityWhitelist), with IP ban support.</p>
+### 📄 VelocityWhitelistExtended
+A fork of TISUnion's [VelocityWhitelist](https://github.com/TISUnion/VelocityWhitelist), with improved performance, reliability and IP ban support.
 
 ***
 #### 🪛 Changes
 A list of what's changed versus the original plugin.
 ***
-- Updated logic so whitelist & blacklist can be enabled at the same time (with blacklist taking priority)
-- Implement IP bans (takes priority over blacklist) 
-- Updated configuration file to support IP bans
+- Whitelist & blacklist can now both be active at the same time (blacklist takes priority)
+- An IP ban system to block specific IP addresses from connecting at all (checked before either blacklist or whitelist)
+- Configurable automatic blacklist that can blacklist their account when joining from a banned IP rather than just kicking them (check the config comments for more info)
+- New default player-identification mode for new setups (existing setups are left untouched and work exactly as before) 
+- Automatic upgrade system for configs to new format the first time you run the updated version (check migration section for more info)
+- Reliability improvements, including a safer file management system to prevent corrupt or invalid files wiping your existing config on reload and a couple of rare race condition issues
 - Small updates to modernise and clean up existing code
+
+***
+#### 🔄️ Migrating
+If you're currently running TISUnion's original plugin, you can easily & safely switch to this fork while keeping your existing whitelist & blacklist.
+***
+1. **Backup your existing config** - Just like any changes, make a backup of `plugin/velocitywhitelist` folder somewhere safe so you can easily revert back.
+2. **Stop your proxy** - Note that this is the proxy, not your Minecraft server. 
+3. **Replace the plugin** - Delete / move the existing `VelocityWhitelist.jar` from your proxy's `plugins` folder and upload this fork's `VelocityWhitelist.jar` from [releases](https://github.com/no7here/VelocityWhitelist/releases/latest) in its place.
+4. **Start your proxy again** - On first start, the plugin will automatically update your `config.yml` to the new format for you. Your existing whitelist, blacklist and settings (including whether you used names or UUIDs) are carried over unchanged.
+5. **Try new features (optional)** - By default, only IP bans are enabled on migration. If you would like to enable automatic blacklisting, edit the config file and run `/velocitywhitelist reload`.
 
 ***
 #### 📄 Files
@@ -54,7 +67,7 @@ blacklist_on_ipban_join: true
 > <hr>
 > <b>TL;DR:</b> Not doing so would allow an attacker to get any player name banned by connecting through a banned IP, including server administrators.
 > <br><br>
-> If either condition isn't true, player identities cannot be verified and an attacker can use a banned IP with an arbitrary player name and get it blacklisted. 
+> <b>TS;WM:</b> If either condition isn't true, player identities cannot be verified and an attacker can use a banned IP with an arbitrary player name and get it blacklisted. 
 > <br><br>
 > To prevent this, if the requirement isn't met, whether at first startup, after config migration or after any config reload, the plugin will force this option off in memory regardless of what's written in this file and print a warning explaining which requirement is missing.
 > <br><br>
