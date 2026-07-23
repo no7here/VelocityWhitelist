@@ -180,7 +180,7 @@ public class WhitelistManager
 		{
 			uuid = profile.map(GameProfile::getId);
 		}
-		if (uuid.isEmpty() && profile.isEmpty() && this.config.getIdentifyMode() != IdentifyMode.NAME)  // no need to lookup for name mode
+		if (uuid.isEmpty() && profile.isEmpty())  // NAME mode needs this too now, to get a canonical-case name for offline targets
 		{
 			// uuid == null && profile == null  -> input is name, player not online
 			if (this.server.getConfiguration().isOnlineMode())
