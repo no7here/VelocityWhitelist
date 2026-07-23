@@ -106,31 +106,8 @@ public class IpBanCommand
 		{
 			return 0;
 		}
-		String targetIp = parsed.get();
 
-		synchronized (this.manager.getIpBanLock())
-		{
-			if (list.addIp(targetIp))
-			{
-				if (this.manager.saveList(list))
-				{
-					source.sendMessage(Component.text(String.format("Added IP %s to the IP ban list", targetIp)));
-
-					// Automatically disconnect anyone connected on a banned IP
-					this.manager.kickIpBannedPlayers();
-					return 1;
-				}
-				else
-				{
-					list.removeIp(targetIp); // rollback
-					source.sendMessage(Component.text("Error: Failed to save the IP ban list to disk. Action was not applied."));
-					return 0;
-				}
-			}
-		}
-
-		source.sendMessage(Component.text(String.format("IP %s is already in the IP ban list", targetIp)));
-		return 0;
+		return this.manager.addIp(source, parsed.get()) ? 1 : 0;
 	}
 
 	private int removeIp(CommandSource source, String ipStr)
@@ -147,28 +124,8 @@ public class IpBanCommand
 		{
 			return 0;
 		}
-		String targetIp = parsed.get();
 
-		synchronized (this.manager.getIpBanLock())
-		{
-			if (list.removeIp(targetIp))
-			{
-				if (this.manager.saveList(list))
-				{
-					source.sendMessage(Component.text(String.format("Removed IP %s from the IP ban list", targetIp)));
-					return 1;
-				}
-				else
-				{
-					list.addIp(targetIp); // rollback
-					source.sendMessage(Component.text("Error: Failed to save the IP ban list to disk. Action was not applied."));
-					return 0;
-				}
-			}
-		}
-
-		source.sendMessage(Component.text(String.format("IP %s is not in the IP ban list", targetIp)));
-		return 0;
+		return this.manager.removeIp(source, parsed.get()) ? 1 : 0;
 	}
 
 	private int listIps(CommandSource source)
