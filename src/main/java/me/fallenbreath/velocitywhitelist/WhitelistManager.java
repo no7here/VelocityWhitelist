@@ -236,29 +236,39 @@ public class WhitelistManager
 		};
 	}
 
+	/**
+	 * Saves the given list after a mutation. If the save fails, undoes the mutation via
+	 * {@code rollback} and runs {@code onFailure} (a command-source message, or a silent
+	 * no-op for background callers like the auto-blacklist), so a failed save never leaves
+	 * the in-memory list out of sync with what's actually on disk.
+	 */
+	private boolean saveOrRollback(YamlStoredList<?> list, Runnable rollback, Runnable onFailure)
+	{
+		if (this.saveList(list))
+		{
+			return true;
+		}
+		rollback.run();
+		onFailure.run();
+		return false;
+	}
+
 	public boolean addPlayer(CommandSource source, PlayerList list, String value)
 	{
 		boolean isBlacklist = list == this.getBlacklist();
 		return this.operatePlayer(
 				source, value,
 				(uuid, playerName) -> {
-					boolean added = false;
+					boolean added;
 
 					// Lock is acquired only after operatePlayer (which executes Mojang synchronous lookup) completes
 					synchronized (this.saveLock)
 					{
-						if (list.addPlayerName(playerName))
+						added = list.addPlayerName(playerName);
+						if (added && !this.saveOrRollback(list, () -> list.removePlayerName(playerName), () ->
+								source.sendMessage(Component.text(String.format("Failed to save the %s to disk. Action was not applied.", list.getName())))))
 						{
-							if (this.saveList(list))
-							{
-								added = true;
-							}
-							else
-							{
-								list.removePlayerName(playerName); // rollback
-								source.sendMessage(Component.text(String.format("Failed to save the %s to disk. Action was not applied.", list.getName())));
-								return false;  // the action was not applied, so no blacklist kick either
-							}
+							return false;  // the action was not applied, so no blacklist kick either
 						}
 					}
 
@@ -293,10 +303,9 @@ public class WhitelistManager
 						if (addedNew || nameChanged)
 						{
 							list.putPlayerUUID(uuid, playerName);
-							if (!this.saveList(list))
+							if (!this.saveOrRollback(list, () -> this.rollbackUuidEntry(list, uuid, oldEntry), () ->
+									source.sendMessage(Component.text(String.format("Failed to save the %s to disk. Action was not applied.", list.getName())))))
 							{
-								this.rollbackUuidEntry(list, uuid, oldEntry);
-								source.sendMessage(Component.text(String.format("Failed to save the %s to disk. Action was not applied.", list.getName())));
 								return false;  // the action was not applied, so no blacklist kick either
 							}
 						}
@@ -338,17 +347,13 @@ public class WhitelistManager
 					{
 						if (list.removePlayerName(playerName))
 						{
-							if (this.saveList(list))
+							if (this.saveOrRollback(list, () -> list.addPlayerName(playerName), () ->
+									source.sendMessage(Component.text(String.format("Failed to save the %s to disk. Action was not applied.", list.getName())))))
 							{
 								source.sendMessage(Component.text(String.format("Removed player %s from the %s", playerName, list.getName())));
 								return true;
 							}
-							else
-							{
-								list.addPlayerName(playerName); // rollback
-								source.sendMessage(Component.text(String.format("Failed to save the %s to disk. Action was not applied.", list.getName())));
-								return false;
-							}
+							return false;
 						}
 					}
 					source.sendMessage(Component.text(String.format("Player %s is not in the %s", playerName, list.getName())));
@@ -362,17 +367,13 @@ public class WhitelistManager
 						if (oldEntry.exists())
 						{
 							list.removePlayerUUID(uuid);
-							if (this.saveList(list))
+							if (this.saveOrRollback(list, () -> this.rollbackUuidEntry(list, uuid, oldEntry), () ->
+									source.sendMessage(Component.text(String.format("Failed to save the %s to disk. Action was not applied.", list.getName())))))
 							{
 								source.sendMessage(Component.text(String.format("Removed player %s from the %s", displayName, list.getName())));
 								return true;
 							}
-							else
-							{
-								this.rollbackUuidEntry(list, uuid, oldEntry);
-								source.sendMessage(Component.text(String.format("Failed to save the %s to disk. Action was not applied.", list.getName())));
-								return false;
-							}
+							return false;
 						}
 					}
 					source.sendMessage(Component.text(String.format("Player %s is not in the %s", displayName, list.getName())));
@@ -437,18 +438,14 @@ public class WhitelistManager
 		{
 			if (this.ipBanList.addIp(ip))
 			{
-				if (this.saveList(this.ipBanList))
+				if (this.saveOrRollback(this.ipBanList, () -> this.ipBanList.removeIp(ip), () ->
+						source.sendMessage(Component.text("Error: Failed to save the IP ban list to disk. Action was not applied."))))
 				{
 					source.sendMessage(Component.text(String.format("Added IP %s to the IP ban list", ip)));
 					this.kickIpBannedPlayers();
 					return true;
 				}
-				else
-				{
-					this.ipBanList.removeIp(ip); // rollback
-					source.sendMessage(Component.text("Error: Failed to save the IP ban list to disk. Action was not applied."));
-					return false;
-				}
+				return false;
 			}
 		}
 		source.sendMessage(Component.text(String.format("IP %s is already in the IP ban list", ip)));
@@ -464,17 +461,13 @@ public class WhitelistManager
 		{
 			if (this.ipBanList.removeIp(ip))
 			{
-				if (this.saveList(this.ipBanList))
+				if (this.saveOrRollback(this.ipBanList, () -> this.ipBanList.addIp(ip), () ->
+						source.sendMessage(Component.text("Error: Failed to save the IP ban list to disk. Action was not applied."))))
 				{
 					source.sendMessage(Component.text(String.format("Removed IP %s from the IP ban list", ip)));
 					return true;
 				}
-				else
-				{
-					this.ipBanList.addIp(ip); // rollback
-					source.sendMessage(Component.text("Error: Failed to save the IP ban list to disk. Action was not applied."));
-					return false;
-				}
+				return false;
 			}
 		}
 		source.sendMessage(Component.text(String.format("IP %s is not in the IP ban list", ip)));
@@ -595,13 +588,9 @@ public class WhitelistManager
 	{
 		PlayerList.UuidEntry oldEntry = this.blacklist.peekPlayerUUID(profile.getId());
 		this.blacklist.putPlayerUUID(profile.getId(), profile.getName());
-		if (this.saveList(this.blacklist))
+		if (this.saveOrRollback(this.blacklist, () -> this.rollbackUuidEntry(this.blacklist, profile.getId(), oldEntry), () -> {}))
 		{
 			this.logger.info("Automatically added player UUID {} ({}) to the blacklist due to joining on banned IP", profile.getId(), profile.getName());
-		}
-		else
-		{
-			this.rollbackUuidEntry(this.blacklist, profile.getId(), oldEntry); // rollback on failed save
 		}
 	}
 
