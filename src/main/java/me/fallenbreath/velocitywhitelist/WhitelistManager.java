@@ -428,6 +428,59 @@ public class WhitelistManager
 		}
 	}
 
+	/**
+	 * Adds an IP to the ban list and saves it, mirroring addPlayer()'s mutate/save/rollback shape
+	 */
+	public boolean addIp(CommandSource source, String ip)
+	{
+		synchronized (this.ipBanLock)
+		{
+			if (this.ipBanList.addIp(ip))
+			{
+				if (this.saveList(this.ipBanList))
+				{
+					source.sendMessage(Component.text(String.format("Added IP %s to the IP ban list", ip)));
+					this.kickIpBannedPlayers();
+					return true;
+				}
+				else
+				{
+					this.ipBanList.removeIp(ip); // rollback
+					source.sendMessage(Component.text("Error: Failed to save the IP ban list to disk. Action was not applied."));
+					return false;
+				}
+			}
+		}
+		source.sendMessage(Component.text(String.format("IP %s is already in the IP ban list", ip)));
+		return false;
+	}
+
+	/**
+	 * Removes an IP from the ban list and saves it, mirroring removePlayer()'s mutate/save/rollback shape
+	 */
+	public boolean removeIp(CommandSource source, String ip)
+	{
+		synchronized (this.ipBanLock)
+		{
+			if (this.ipBanList.removeIp(ip))
+			{
+				if (this.saveList(this.ipBanList))
+				{
+					source.sendMessage(Component.text(String.format("Removed IP %s from the IP ban list", ip)));
+					return true;
+				}
+				else
+				{
+					this.ipBanList.addIp(ip); // rollback
+					source.sendMessage(Component.text("Error: Failed to save the IP ban list to disk. Action was not applied."));
+					return false;
+				}
+			}
+		}
+		source.sendMessage(Component.text(String.format("IP %s is not in the IP ban list", ip)));
+		return false;
+	}
+
 	public void onPlayerLogin(LoginEvent event)
 	{
 		Player player = event.getPlayer();
