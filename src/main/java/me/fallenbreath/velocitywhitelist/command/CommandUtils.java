@@ -1,5 +1,6 @@
 package me.fallenbreath.velocitywhitelist.command;
 
+import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 
 import com.mojang.brigadier.arguments.ArgumentType;
@@ -23,11 +24,11 @@ public class CommandUtils
 
 	public static CompletableFuture<Suggestions> suggestMatching(Iterable<String> suggestions, SuggestionsBuilder suggestionsBuilder)
 	{
-		String remaining = suggestionsBuilder.getRemaining().toLowerCase();
+		String remaining = suggestionsBuilder.getRemaining().toLowerCase(Locale.ROOT);
 
 		for (String suggestion : suggestions)
 		{
-			if (suggestion.toLowerCase().startsWith(remaining))
+			if (suggestion.toLowerCase(Locale.ROOT).startsWith(remaining))
 			{
 				suggestionsBuilder.suggest(suggestion);
 			}

@@ -68,7 +68,7 @@ public class VelocityWhitelistPlugin
 
 	private boolean prepareConfig()
 	{
-		if (!this.dataDirectory.toFile().exists() && !this.dataDirectory.toFile().mkdir())
+		if (!this.dataDirectory.toFile().exists() && !this.dataDirectory.toFile().mkdirs())
 		{
 			this.logger.error("Create data directory failed");
 			return false;

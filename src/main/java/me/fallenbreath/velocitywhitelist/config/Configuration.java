@@ -4,10 +4,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import org.slf4j.Logger;
-import org.yaml.snakeyaml.Yaml;
 
 import com.google.common.base.Supplier;
 import com.google.common.collect.Maps;
@@ -56,7 +57,7 @@ public class Configuration
 	{
 		// Parse and migrate into a staging map before publishing, so a malformed config during a reload
 		// keeps the previous state enforced, and concurrent logins never see a half-built option set
-		Map<String, Object> loadedOptions = (Map<String, Object>)new Yaml().load(yamlContent);
+		Map<String, Object> loadedOptions = (Map<String, Object>)FileUtils.newSafeYaml().load(yamlContent);
 
 		Map<String, Object> stagedOptions = Maps.newLinkedHashMap();
 		if (loadedOptions != null)  // an empty config file parses to null
@@ -68,6 +69,7 @@ public class Configuration
 
 		this.snapshot = new Snapshot(stagedOptions, makeIdentifyMode(stagedOptions, this.logger));
 		this.warnAboutRiskyOptions();
+		this.warnAboutInvalidBooleanOptions();
 	}
 
 	public void reload() throws IOException
@@ -86,6 +88,34 @@ public class Configuration
 	}
 
 	/**
+	 * Parses a config version value that should be a YAML Number, but also accepts a hand-quoted
+	 * numeric string (e.g. `version: "2"`) so an already-current config doesn't get misdetected as
+	 * legacy and needlessly re-migrated (including rewriting the file) on every load
+	 */
+	private static int parseVersion(Object versionObj)
+	{
+		if (versionObj instanceof Number number)
+		{
+			return number.intValue();
+		}
+		if (versionObj instanceof String s && s.matches("\\d+"))
+		{
+			try
+			{
+				return Integer.parseInt(s);
+			}
+			catch (NumberFormatException e)
+			{
+				// A digit-only string too large to fit in an int is necessarily >= CONFIG_VERSION,
+				// so treat it the same as any other already-current version rather than letting the
+				// whole config load fail over an oversized (if nonsensical) version number
+				return Integer.MAX_VALUE;
+			}
+		}
+		return 0;
+	}
+
+	/**
 	 * Migrates the given staging options to the current config version, returning the map to publish
 	 */
 	private Map<String, Object> migrate(Map<String, Object> options)
@@ -95,7 +125,7 @@ public class Configuration
 		{
 			versionObj = options.get("version");
 		}
-		int version = versionObj instanceof Number number ? number.intValue() : 0;
+		int version = parseVersion(versionObj);
 		if (version >= CONFIG_VERSION)
 		{
 			return options;
@@ -157,7 +187,7 @@ public class Configuration
 		this.logger.warn("blacklist_on_ipban_join is enabled in the config, but its requirements are not met, so it has been forced off:");
 		if (snapshot.identifyMode != IdentifyMode.UUID)
 		{
-			this.logger.warn("- identify_mode must be uuid (currently: {})", snapshot.identifyMode.name().toLowerCase());
+			this.logger.warn("- identify_mode must be uuid (currently: {})", snapshot.identifyMode.name().toLowerCase(Locale.ROOT));
 		}
 		if (!this.isProxyOnlineMode())
 		{
@@ -171,6 +201,26 @@ public class Configuration
 		return this.proxyOnlineModeGetter.get();
 	}
 
+	/**
+	 * Warns once per load/reload about any boolean option that's present but not actually a
+	 * Boolean (e.g. a hand-quoted "true" string parses as a String under SnakeYAML). This must run
+	 * here rather than from the getters themselves: isWhitelistEnabled/isBlacklistEnabled/
+	 * isIpBanEnabled are read on every single login via each list's isActivated(), so a warning in
+	 * the getter would repeat on every connection instead of once per config load
+	 */
+	private void warnAboutInvalidBooleanOptions()
+	{
+		Map<String, Object> options = this.snapshot.options;
+		for (String key : List.of("whitelist_enabled", "blacklist_enabled", "ipban_enabled", "blacklist_on_ipban_join"))
+		{
+			Object value = options.get(key);
+			if (value != null && !(value instanceof Boolean))
+			{
+				this.logger.warn("Invalid value for {}: {} (expected true/false), treating as disabled", key, value);
+			}
+		}
+	}
+
 	private static IdentifyMode makeIdentifyMode(Map<String, Object> options, Logger logger)
 	{
 		Object mode = options.get("identify_mode");
@@ -182,7 +232,7 @@ public class Configuration
 			}
 			catch (IllegalArgumentException e)
 			{
-				logger.warn("Invalid identify mode: {}, use default value {}", mode, IdentifyMode.DEFAULT.name().toLowerCase());
+				logger.warn("Invalid identify mode: {}, use default value {}", mode, IdentifyMode.DEFAULT.name().toLowerCase(Locale.ROOT));
 			}
 		}
 		return IdentifyMode.DEFAULT;
@@ -190,32 +240,29 @@ public class Configuration
 
 	public boolean isWhitelistEnabled()
 	{
-		Object enabled = this.snapshot.options.get("whitelist_enabled");
-		if (enabled instanceof Boolean)
-		{
-			return (Boolean)enabled;
-		}
-		return false;
+		return this.getBooleanOption("whitelist_enabled");
 	}
 
 	public boolean isBlacklistEnabled()
 	{
-		Object enabled = this.snapshot.options.get("blacklist_enabled");
-		if (enabled instanceof Boolean)
-		{
-			return (Boolean)enabled;
-		}
-		return false;
+		return this.getBooleanOption("blacklist_enabled");
 	}
 
 	public boolean isIpBanEnabled()
 	{
-		Object enabled = this.snapshot.options.get("ipban_enabled");
-		if (enabled instanceof Boolean)
-		{
-			return (Boolean)enabled;
-		}
-		return false;
+		return this.getBooleanOption("ipban_enabled");
+	}
+
+	/**
+	 * Reads a boolean config option, defaulting to false (disabled) if it's absent or not actually
+	 * a Boolean. Invalid values are warned about once per load in warnAboutInvalidBooleanOptions(),
+	 * not here: this getter is called on every single login (via each list's isActivated()), so it
+	 * must stay a pure read with no logging side effect
+	 */
+	private boolean getBooleanOption(String key)
+	{
+		Object value = this.snapshot.options.get(key);
+		return value instanceof Boolean b && b;
 	}
 
 	public boolean isBlacklistOnIpBanJoin()

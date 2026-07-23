@@ -2,6 +2,8 @@ package me.fallenbreath.velocitywhitelist.command;
 
 import static me.fallenbreath.velocitywhitelist.command.CommandUtils.literal;
 
+import java.util.Locale;
+
 import org.slf4j.Logger;
 
 import com.velocitypowered.api.command.BrigadierCommand;
@@ -70,7 +72,7 @@ public class PluginControlCommand
 	private int showPluginInfo(CommandSource source)
 	{
 		source.sendMessage(Component.text(String.format("%s v%s", PluginMeta.NAME, PluginMeta.VERSION)));
-		source.sendMessage(Component.text(String.format("Identify Mode: %s", this.config.getIdentifyMode().name().toLowerCase())));
+		source.sendMessage(Component.text(String.format("Identify Mode: %s", this.config.getIdentifyMode().name().toLowerCase(Locale.ROOT))));
 		source.sendMessage(Component.text(PluginMeta.REPOSITORY_URL, NamedTextColor.BLUE, TextDecoration.UNDERLINED).clickEvent(ClickEvent.openUrl(PluginMeta.REPOSITORY_URL)));
 		source.sendMessage(Component.text("Whitelist:"));
 		WhitelistCommand.showListStatus(source, this.manager.getWhitelist(), "  ");
@@ -79,6 +81,6 @@ public class PluginControlCommand
 		source.sendMessage(Component.text("IP Ban List:"));
 		source.sendMessage(Component.text(String.format("  Activated: %s (config enabled: %s, load ok: %s)", this.manager.getIpBanList().isActivated(), this.manager.getIpBanList().isConfigEnabled(), this.manager.getIpBanList().isLoadOk())));
 		source.sendMessage(Component.text(String.format("  Size: %d IP addresses", this.manager.getIpBanList().getIps().size())));
-		return 0;
+		return 1;
 	}
 }
