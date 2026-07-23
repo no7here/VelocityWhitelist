@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
+import java.util.Locale;
 import java.util.Map;
 
 import org.slf4j.Logger;
@@ -174,7 +175,7 @@ public class Configuration
 		this.logger.warn("blacklist_on_ipban_join is enabled in the config, but its requirements are not met, so it has been forced off:");
 		if (snapshot.identifyMode != IdentifyMode.UUID)
 		{
-			this.logger.warn("- identify_mode must be uuid (currently: {})", snapshot.identifyMode.name().toLowerCase());
+			this.logger.warn("- identify_mode must be uuid (currently: {})", snapshot.identifyMode.name().toLowerCase(Locale.ROOT));
 		}
 		if (!this.isProxyOnlineMode())
 		{
@@ -199,7 +200,7 @@ public class Configuration
 			}
 			catch (IllegalArgumentException e)
 			{
-				logger.warn("Invalid identify mode: {}, use default value {}", mode, IdentifyMode.DEFAULT.name().toLowerCase());
+				logger.warn("Invalid identify mode: {}, use default value {}", mode, IdentifyMode.DEFAULT.name().toLowerCase(Locale.ROOT));
 			}
 		}
 		return IdentifyMode.DEFAULT;
